@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="manifest.json">
+<title>Paycheck Plan</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f3f4f6;color:#111827}
+*{box-sizing:border-box}body{margin:0}.wrap{max-width:760px;margin:auto;padding:20px 16px 45px}
+h1{font-size:32px;margin:0}.sub{color:#6b7280;margin:5px 0 20px}
+.card{background:#fff;border-radius:18px;padding:18px;margin:14px 0;box-shadow:0 2px 12px #0000000c}
+h2{margin:0 0 14px;font-size:21px}.label{font-weight:700;display:block;margin:12px 0 6px}
+input[type=number]{width:100%;padding:14px;border:1px solid #d1d5db;border-radius:12px;font-size:18px}
+.check{display:flex;align-items:center;gap:10px;font-weight:600;margin:14px 0}.check input{width:20px;height:20px}
+button{width:100%;border:0;border-radius:12px;padding:13px 15px;background:#111827;color:#fff;font-size:16px;font-weight:700;margin-top:8px}
+button.secondary{background:#e5e7eb;color:#111827}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.item{background:#f9fafb;border-radius:14px;padding:13px}.item b{display:block;color:#6b7280;font-size:13px}
+.money{font-size:21px;font-weight:800;margin:4px 0 7px}.small{font-size:13px;color:#6b7280}
+.notice{padding:12px;border-radius:12px;background:#eff6ff;color:#1e40af;font-size:14px;margin-top:12px}
+.bar{height:12px;background:#e5e7eb;border-radius:99px;overflow:hidden}.fill{height:100%;width:0;background:#111827}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.history-item{border-top:1px solid #e5e7eb;padding:12px 0}.history-item:first-child{border-top:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Paycheck Plan</h1>
+<p class="sub">Plan your paycheck, track your money, and keep up with your goals.</p>
+
+<div class="card">
+<h2>New Paycheck</h2>
+<label class="label">Paycheck amount</label>
+<input id="paycheck" type="number" inputmode="decimal" min="0" step=".01" placeholder="500.00">
+<label class="check"><input id="insurance" type="checkbox"> This is my insurance paycheck ($100)</label>
+<button onclick="calculate()">Plan This Paycheck</button>
+<div id="plan" style="display:none">
+<div class="notice" id="insuranceNote"></div>
+<div class="grid" style="margin-top:12px">
+<div class="item"><b>Savings — 40%</b><div class="money" id="aSavings">$0.00</div></div>
+<div class="item"><b>Gas — 25%</b><div class="money" id="aGas">$0.00</div></div>
+<div class="item"><b>Pokémon — 5%</b><div class="money" id="aPokemon">$0.00</div></div>
+<div class="item"><b>Spending — 20%</b><div class="money" id="aSpending">$0.00</div></div>
+<div class="item"><b>Buffer — 10%</b><div class="money" id="aBuffer">$0.00</div></div>
+<div class="item"><b>Insurance</b><div class="money" id="aInsurance">$0.00</div></div>
+</div>
+<button onclick="savePaycheck()">Add This Paycheck</button>
+</div>
+</div>
+
+<div class="card">
+<h2>Balances</h2>
+<div class="grid" id="balances"></div>
+<p class="small">Use Add Money for money you receive separately. Use Remove Money whenever you spend from a category.</p>
+</div>
+
+<div class="card">
+<h2>Savings Goal</h2>
+<div class="row"><b>$1,000 emergency goal</b><span id="sPct">0%</span></div>
+<div class="bar" style="margin:10px 0"><div class="fill" id="sFill"></div></div>
+<div class="small" id="sText">$0.00 of $1,000</div>
+<label class="label">Add to savings</label>
+<input id="addSavings" type="number" inputmode="decimal" min="0" step=".01" placeholder="Amount">
+<button onclick="addMoney('savings')">Add Money to Savings</button>
+</div>
+
+<div class="card">
+<h2>Pokémon Fund</h2>
+<div class="row"><b>$50 monthly target</b><span id="pPct">0%</span></div>
+<div class="bar" style="margin:10px 0"><div class="fill" id="pFill"></div></div>
+<div class="small" id="pText">$0.00 of $50 this month</div>
+<label class="label">Add to Pokémon fund</label>
+<input id="addPokemon" type="number" inputmode="decimal" min="0" step=".01" placeholder="Amount">
+<button onclick="addMoney('pokemon')">Add Money to Pokémon</button>
+</div>
+
+<div class="card">
+<h2>Paycheck History</h2>
+<div id="history"></div>
+<button class="secondary" onclick="clearHistory()">Clear History</button>
+</div>
+</div>
+
+<script>
+const KEY="paycheckPlanFinal";
+const categories=[
+ ["savings","Savings"],["gas","Gas"],["pokemon","Pokémon"],["spending","Spending"],["buffer","Buffer"],["insurance","Insurance"]
+];
+let data=JSON.parse(localStorage.getItem(KEY)||"null")||{
+ balances:{savings:0,gas:0,pokemon:0,spending:0,buffer:0,insurance:0},
+ history:[],pokemonMonth:0,monthKey:new Date().toISOString().slice(0,7)
+};
+function resetMonth(){const k=new Date().toISOString().slice(0,7);if(data.monthKey!==k){data.monthKey=k;data.pokemonMonth=0;localStorage.setItem(KEY,JSON.stringify(data))}}
+resetMonth();
+let current=null;
+const money=n=>"$"+Number(n||0).toFixed(2);
+function calculate(){
+ const gross=Number(document.getElementById("paycheck").value||0);
+ if(gross<=0){alert("Enter your paycheck amount.");return}
+ const ins=document.getElementById("insurance").checked?Math.min(100,gross):0;
+ const r=Math.max(0,gross-ins);
+ current={gross,insurance:ins,savings:r*.40,gas:r*.25,pokemon:r*.05,spending:r*.20,buffer:r*.10};
+ document.getElementById("insuranceNote").textContent=ins?"$100 is set aside for insurance first. The rest is split into your categories.":"No insurance payment is set aside.";
+ document.getElementById("aSavings").textContent=money(current.savings);
+ document.getElementById("aGas").textContent=money(current.gas);
+ document.getElementById("aPokemon").textContent=money(current.pokemon);
+ document.getElementById("aSpending").textContent=money(current.spending);
+ document.getElementById("aBuffer").textContent=money(current.buffer);
+ document.getElementById("aInsurance").textContent=money(current.insurance);
+ document.getElementById("plan").style.display="block";
+}
+function savePaycheck(){
+ if(!current)return;
+ for(const k of ["savings","gas","pokemon","spending","buffer","insurance"])data.balances[k]+=current[k];
+ data.pokemonMonth+=current.pokemon;
+ data.history.unshift({date:new Date().toLocaleString(),...current});
+ save();
+ alert("Paycheck added!");
+}
+function addMoney(type){
+ const id=type==="savings"?"addSavings":"addPokemon";
+ const n=Number(document.getElementById(id).value||0);
+ if(n<=0){alert("Enter a valid amount.");return}
+ data.balances[type]+=n;
+ if(type==="pokemon")data.pokemonMonth+=n;
+ document.getElementById(id).value="";
+ save();
+}
+function removeMoney(type){
+ const currentBal=Number(data.balances[type]||0);
+ const raw=prompt("How much did you spend from "+categories.find(x=>x[0]===type)[1]+"?");
+ if(raw===null)return;
+ const n=Number(raw);
+ if(!Number.isFinite(n)||n<=0){alert("Enter a valid amount.");return}
+ if(n>currentBal){alert("You only have "+money(currentBal)+" in this category.");return}
+ data.balances[type]-=n;
+ if(type==="pokemon")data.pokemonMonth=Math.max(0,data.pokemonMonth-n);
+ save();
+}
+function save(){localStorage.setItem(KEY,JSON.stringify(data));render()}
+function clearHistory(){if(confirm("Clear paycheck history? Your balances will stay the same.")){data.history=[];save()}}
+function render(){
+ document.getElementById("balances").innerHTML=categories.map(([k,label])=>`
+ <div class="item"><b>${label}</b><div class="money">${money(data.balances[k])}</div>
+ <button onclick="removeMoney('${k}')">Remove Money</button></div>`).join("");
+ const sp=Math.min(100,data.balances.savings/1000*100);
+ document.getElementById("sFill").style.width=sp+"%";document.getElementById("sPct").textContent=Math.round(sp)+"%";document.getElementById("sText").textContent=money(data.balances.savings)+" of $1,000";
+ const pp=Math.min(100,data.pokemonMonth/50*100);
+ document.getElementById("pFill").style.width=pp+"%";document.getElementById("pPct").textContent=Math.round(pp)+"%";document.getElementById("pText").textContent=money(data.pokemonMonth)+" of $50 this month";
+ document.getElementById("history").innerHTML=data.history.length?data.history.map(p=>`
+ <div class="history-item"><div class="row"><b>${p.date}</b><b>${money(p.gross)}</b></div>
+ <div class="small">Insurance ${money(p.insurance)} · Savings ${money(p.savings)} · Gas ${money(p.gas)} · Pokémon ${money(p.pokemon)} · Spending ${money(p.spending)} · Buffer ${money(p.buffer)}</div></div>`).join(""):'<p class="small">No paychecks saved yet.</p>';
+}
+render();
+</script>
+</body>
+</html>

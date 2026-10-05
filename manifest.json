@@ -1,0 +1,8 @@
+{
+  "name":"Paycheck Plan",
+  "short_name":"Paycheck Plan",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#f3f4f6",
+  "theme_color":"#111827"
+}
