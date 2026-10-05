@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="manifest.json">
+<title>Paycheck Plan</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b1020;color:#fff}
+.wrap{max-width:620px;margin:auto;padding:22px 16px 40px}.card{background:#151c30;border:1px solid #27314d;border-radius:18px;padding:18px;margin:14px 0}
+h1{font-size:32px;margin:8px 0 4px}h2{font-size:19px;margin:0 0 12px}p{color:#aeb8cf}
+label{display:block;color:#cbd5e1;font-size:14px;margin:12px 0 6px}
+input[type=number]{width:100%;padding:14px;border-radius:12px;border:1px solid #33405f;background:#0e1528;color:#fff;font-size:20px}
+button{width:100%;padding:14px;border:0;border-radius:12px;background:#3b82f6;color:white;font-weight:800;font-size:16px;margin-top:12px}
+.check{display:flex;gap:10px;align-items:center;margin-top:14px}.check input{width:20px;height:20px}
+.row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #27314d}.row:last-child{border:0}
+.amount{font-weight:800}.small{font-size:13px;color:#94a3b8}.goal{height:12px;background:#27314d;border-radius:99px;overflow:hidden;margin-top:8px}.bar{height:100%;background:#3b82f6;width:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+</style>
+</head>
+<body><div class="wrap">
+<h1>Paycheck Plan</h1><p>Enter your paycheck and see where it should go.</p>
+
+<div class="card">
+<h2>This Paycheck</h2>
+<label for="pay">Paycheck amount</label>
+<input id="pay" type="number" inputmode="decimal" placeholder="500">
+<label class="check"><input id="ins" type="checkbox"> This is my insurance paycheck ($100)</label>
+<button onclick="calculate()">Calculate</button>
+<div id="result"></div>
+</div>
+
+<div class="card">
+<h2>Track Your Money</h2>
+<div class="two">
+<div><div class="small">Savings</div><div id="sav">$0.00</div></div>
+<div><div class="small">Pokémon Fund</div><div id="poke">$0.00</div></div>
+</div>
+<label>Add to savings</label><input id="savAdd" type="number" inputmode="decimal" placeholder="0">
+<button onclick="add('savings','savAdd')">Add to Savings</button>
+<label>Add to Pokémon fund</label><input id="pokeAdd" type="number" inputmode="decimal" placeholder="0">
+<button onclick="add('pokemon','pokeAdd')">Add to Pokémon</button>
+<div class="small" style="margin-top:16px">Savings goal: $1,000</div><div class="goal"><div id="bar" class="bar"></div></div>
+<div class="small" style="margin-top:14px">Pokémon monthly target: $50</div>
+</div>
+
+<div class="card"><h2>Paycheck History</h2><div id="history" class="small">No paychecks saved yet.</div><button onclick="clearHistory()">Clear History</button></div>
+</div>
+<script>
+const key="paycheckPlanV1";
+let data=JSON.parse(localStorage.getItem(key)||'{"savings":0,"pokemon":0,"history":[]}');
+function money(n){return "$"+Number(n).toFixed(2)}
+function save(){localStorage.setItem(key,JSON.stringify(data));render()}
+function calculate(){
+ let pay=Number(document.getElementById("pay").value)||0, insurance=document.getElementById("ins").checked;
+ let after=Math.max(0,pay-(insurance?100:0));
+ let a={insurance:insurance?100:0,savings:after*.40,gas:after*.25,pokemon:after*.05,spending:after*.20,buffer:after*.10};
+ data.savings+=a.savings; data.pokemon+=a.pokemon;
+ data.history.unshift({date:new Date().toLocaleString(),pay,a});
+ data.history=data.history.slice(0,20); save();
+ document.getElementById("result").innerHTML='<div style="margin-top:16px">'+
+ [['Insurance',a.insurance],['Savings',a.savings],['Gas',a.gas],['Pokémon',a.pokemon],['Spending',a.spending],['Buffer',a.buffer]]
+ .map(x=>'<div class="row"><span>'+x[0]+'</span><span class="amount">'+money(x[1])+'</span></div>').join('')+'</div>';
+}
+function add(type,id){let n=Number(document.getElementById(id).value)||0;if(n>0){data[type]+=n;document.getElementById(id).value="";save()}}
+function clearHistory(){data.history=[];save()}
+function render(){
+ document.getElementById("sav").textContent=money(data.savings);document.getElementById("poke").textContent=money(data.pokemon);
+ document.getElementById("bar").style.width=Math.min(100,data.savings/10)+"%";
+ document.getElementById("history").innerHTML=data.history.length?data.history.map(h=>'<div class="row"><span>'+h.date+'<br><span class="small">Paycheck '+money(h.pay)+'</span></span><span class="amount">'+money(h.a.savings)+' saved</span></div>').join(''):'No paychecks saved yet.';
+}
+render();
+</script></body></html>
